@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard — Kadang Kanoman Mandira</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="ls">
+  <div class="logo"><img src="assets/logo.png" alt="Logo"></div>
+  <h1>KADANG KANOMAN<br>MANDIRA</h1>
+  <p>Memuat dashboard...</p>
+  <div class="spinner"></div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<div class="sidebar-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+<div class="app" id="app" style="display:none">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-brand">
+        <div class="sb-logo"><img src="assets/logo.png" alt="Logo"></div>
+        <div>
+          <div class="sb-name">KADANG KANOMAN MANDIRA</div>
+          <div class="sb-sub">Karang Taruna Wringin Kidul</div>
+        </div>
+      </div>
+    </div>
+    <div class="sb-user">
+      <div class="avatar" id="sb-avatar"></div>
+      <div>
+        <div class="sb-uname" id="sb-nama"></div>
+        <div class="sb-urole" id="sb-role"></div>
+      </div>
+    </div>
+    <nav class="sb-nav" id="sb-nav"></nav>
+    <div class="sb-foot">
+      <button class="btn btn-o btn-sm btn-bl" onclick="logout()" style="color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.13)">🚪 Keluar</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="flex items-center gap-2">
+        <button class="icon-btn hamburger" onclick="openSidebar()">☰</button>
+        <div class="topbar-title" id="page-title">Dashboard</div>
+      </div>
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">🌙</button>
+    </div>
+    <div class="content" id="content">
+      <div class="empty-state"><span class="ic">⏳</span><h3>Memuat...</h3></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { getSession, clearSession, applyTheme, toggleTheme as tgTheme, fbSub, av, esc } from './js/firebase.js';
+import { renderPage, initPage, rArisan, initArisanWheel } from './js/app.js';
+window.rArisan = rArisan;
+window.initArisanWheel = initArisanWheel;
+
+// ── THEME ──────────────────────────────────────────────────────
+let DK = applyTheme();
+window.toggleTheme = function() { DK = tgTheme(); document.getElementById('theme-btn').textContent = DK ? '☀️' : '🌙'; };
+
+// ── SESSION CHECK ──────────────────────────────────────────────
+const ses = getSession();
+if (!ses) { window.location.href = 'index.html'; }
+
+let CU = ses;
+window.CU = CU;
+
+// ── SIDEBAR ────────────────────────────────────────────────────
+function renderSidebar() {
+  document.getElementById('sb-avatar').textContent = av(CU.nama);
+  document.getElementById('sb-nama').textContent = CU.nama;
+  document.getElementById('sb-role').innerHTML = `<span class="role-badge r-${CU.role}">${CU.role}</span>`;
+  const isAdmin = CU.role === 'admin';
+  const pages = [
+    { id:'dashboard', icon:'🏠', label:'Beranda' },
+    { id:'rapat',     icon:'📅', label:'Jadwal Rapat' },
+    { id:'struktur',  icon:'🏛️', label:'Struktur Organisasi' },
+    { id:'kalender',  icon:'📆', label:'Kalender Agenda' },
+    { id:'notulen',   icon:'📝', label:'Riwayat Rapat' },
+    { id:'kas',       icon:'💰', label:'Transparansi Kas' },
+  ];
+  // Arisan visible to all, but only admin/bendahara can spin
+  pages.push({ id:'arisan', icon:'🎡', label:'Sistem Arisan' });
+  if (isAdmin) {
+    pages.push({ id:'anggota',       icon:'👥', label:'Data Anggota', section:'Admin' });
+    pages.push({ id:'absensi_rekap', icon:'📊', label:'Rekap Absensi' });
+  }
+  let html = '<div class="nav-sec">Menu Utama</div>';
+  let lastSection = '';
+  pages.forEach(p => {
+    if (p.section && p.section !== lastSection) {
+      html += `<div class="nav-sec">${p.section}</div>`;
+      lastSection = p.section;
+    }
+    html += `<div class="nav-item${window.currentPage===p.id?' act':''}" onclick="navigate('${p.id}')">
+      <span class="nav-icon">${p.icon}</span><span>${p.label}</span></div>`;
+  });
+  document.getElementById('sb-nav').innerHTML = html;
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────
+const titles = { dashboard:'Beranda', rapat:'Jadwal Rapat', anggota:'Data Anggota', absensi_rekap:'Rekap Absensi', struktur:'Struktur Organisasi', kalender:'Kalender Agenda', notulen:'Riwayat Rapat', kas:'Kas Organisasi', arisan:'Sistem Arisan' };
+
+window.currentPage = 'dashboard';
+window.navigate = function(page) {
+  window.currentPage = page;
+  document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+  renderSidebar();
+  renderPage(page, CU, window.CA || {});
+  closeSidebar();
+};
+
+window.openSidebar  = () => { document.getElementById('sidebar').classList.add('open'); document.getElementById('sb-overlay').classList.add('open'); };
+window.closeSidebar = () => { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-overlay').classList.remove('open'); };
+window.logout = () => { clearSession(); window.location.href = 'index.html'; };
+
+// ── DATA SUBSCRIPTIONS ─────────────────────────────────────────
+window.CA = { users:[], rapats:[], absensi:[], agenda:[], struktur:[], kas:[], arisan:[] };
+const cols = ['users','rapats','absensi','agenda','struktur','kas','arisan'];
+let loaded = 0;
+
+cols.forEach(col => {
+  fbSub(col, data => {
+    window.CA[col] = data;
+    loaded++;
+    if (loaded >= cols.length) {
+      // All collections loaded at least once
+      renderPage(window.currentPage, CU, window.CA);
+  // Init arisan page
+  if (window.currentPage === 'arisan') {
+    // Load pertemuan then init wheel
+    window.loadArisanPertemuan && window.loadArisanPertemuan().then(() => {
+      renderPage(window.currentPage, window.CU, window.CA);
+      setTimeout(() => window.initArisanWheel && window.initArisanWheel(), 80);
+    });
+  }
+    } else {
+      // Re-render on every realtime update after initial load
+      if (loaded > cols.length) renderPage(window.currentPage, CU, window.CA);
+    }
+  });
+});
+
+// ── SPIN STATE SYNC (real-time for all viewers) ───────────────
+import { fbSub as fbSubDoc2, db } from './js/firebase.js';
+import { onSnapshot, doc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+// Subscribe to spin_state document
+onSnapshot(doc(db, 'meta', 'spin_state'), snap => {
+  if (!snap.exists()) return;
+  const state = snap.data();
+  // Only mirror for non-admin viewers on arisan page
+  if (window.currentPage !== 'arisan') return;
+  if (window._arisanCanEdit) return; // admin handles own spin
+  // Trigger mirror spin for viewers
+  if (typeof window._handleSpinStateViewer === 'function') {
+    window._handleSpinStateViewer(state);
+  }
+});
+
+// ── BOOT ───────────────────────────────────────────────────────
+renderSidebar();
+document.getElementById('ls').classList.add('hide');
+document.getElementById('app').style.display = 'flex';
+initPage();
+</script>
+</body>
+</html>

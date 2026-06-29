@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Login — Kadang Kanoman Mandira</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* auth-only overrides */
+  .tabs{display:flex;gap:0;margin-bottom:1.5rem;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bd)}
+  .tab{flex:1;padding:.55rem;text-align:center;font-size:.85rem;font-weight:500;cursor:pointer;background:var(--sf2);color:var(--tx2);transition:all .15s}
+  .tab.act{background:var(--pr);color:#fff}
+  .form-pane{display:none}.form-pane.act{display:block}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="ls">
+  <div class="logo"><img src="assets/logo.png" alt="Logo"></div>
+  <h1>KADANG KANOMAN<br>MANDIRA</h1>
+  <p>Karang Taruna Desa Wringin Kidul</p>
+  <div class="spinner"></div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<div id="app" style="display:none">
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-img"><img src="assets/logo.png" alt="Logo"></div>
+        <h1>KADANG KANOMAN MANDIRA</h1>
+        <p>Karang Taruna Desa Wringin Kidul</p>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <div class="tab act" id="tab-login" onclick="switchTab('login')">Masuk</div>
+        <div class="tab" id="tab-reg" onclick="switchTab('register')">Daftar</div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div class="form-pane act" id="pane-login">
+        <div class="err-msg" id="err-login"></div>
+        <div class="fg"><label>Nama Lengkap</label><input id="l-nama" type="text" placeholder="Masukkan nama lengkap" autocomplete="name"></div>
+        <div class="fg"><label>Tanggal Lahir</label><input id="l-tgl" type="date"></div>
+        <div class="fg"><label>Password</label><input id="l-pass" type="password" placeholder="Password"></div>
+        <button class="btn btn-p btn-bl" id="btn-login" onclick="doLogin()">Masuk</button>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div class="form-pane" id="pane-reg">
+        <div class="err-msg" id="err-reg"></div>
+        <div class="fg"><label>Nama Lengkap</label><input id="r-nama" type="text" placeholder="Nama lengkap" autocomplete="name"></div>
+        <div class="fg"><label>Tanggal Lahir</label><input id="r-tgl" type="date"></div>
+        <div class="fg"><label>Password</label><input id="r-pass" type="password" placeholder="Min. 6 karakter"></div>
+        <div class="fg"><label>Konfirmasi Password</label><input id="r-pass2" type="password" placeholder="Ulangi password"></div>
+        <button class="btn btn-p btn-bl" id="btn-reg" onclick="doReg()">Daftar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { fbGet, fbSet, getSession, saveSession, initDefaults, applyTheme, toast } from './js/firebase.js';
+
+applyTheme();
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  if (el) { el.style.display = 'block'; el.textContent = msg; }
+}
+function hideErr(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+window.switchTab = function(tab) {
+  document.getElementById('tab-login').classList.toggle('act', tab === 'login');
+  document.getElementById('tab-reg').classList.toggle('act', tab === 'register');
+  document.getElementById('pane-login').classList.toggle('act', tab === 'login');
+  document.getElementById('pane-reg').classList.toggle('act', tab === 'register');
+  hideErr('err-login'); hideErr('err-reg');
+};
+
+window.doLogin = async function() {
+  const nama = document.getElementById('l-nama').value.trim();
+  const tgl  = document.getElementById('l-tgl').value;
+  const pass = document.getElementById('l-pass').value;
+  hideErr('err-login');
+  if (!nama || !tgl || !pass) { showErr('err-login', 'Semua field wajib diisi.'); return; }
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = 'Memproses...';
+  try {
+    const users = await fbGet('users');
+    const user  = users.find(u => u.nama.toLowerCase() === nama.toLowerCase() && u.tgl_lahir === tgl && u.password === pass);
+    if (!user) { showErr('err-login', 'Data tidak ditemukan. Periksa nama, tanggal lahir, dan password.'); btn.disabled = false; btn.textContent = 'Masuk'; return; }
+    saveSession(user);
+    window.location.href = 'dashboard.html';
+  } catch(e) {
+    showErr('err-login', 'Gagal terhubung: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Masuk';
+  }
+};
+
+window.doReg = async function() {
+  const nama  = document.getElementById('r-nama').value.trim();
+  const tgl   = document.getElementById('r-tgl').value;
+  const pass  = document.getElementById('r-pass').value;
+  const pass2 = document.getElementById('r-pass2').value;
+  hideErr('err-reg');
+  if (!nama || !tgl || !pass) { showErr('err-reg', 'Semua field wajib diisi.'); return; }
+  if (pass !== pass2)          { showErr('err-reg', 'Password tidak cocok.'); return; }
+  if (pass.length < 6)         { showErr('err-reg', 'Password minimal 6 karakter.'); return; }
+  const btn = document.getElementById('btn-reg');
+  btn.disabled = true; btn.textContent = 'Mendaftar...';
+  try {
+    const users = await fbGet('users');
+    if (users.find(u => u.nama.toLowerCase() === nama.toLowerCase() && u.tgl_lahir === tgl)) {
+      showErr('err-reg', 'Akun dengan nama dan tanggal lahir ini sudah terdaftar.');
+      btn.disabled = false; btn.textContent = 'Daftar'; return;
+    }
+    const newId = Math.random().toString(36).substr(2, 9);
+    await fbSet('users', newId, { nama, tgl_lahir: tgl, password: pass, role: 'anggota' });
+    saveSession({ id: newId, nama, tgl_lahir: tgl, role: 'anggota' });
+    toast('Akun berhasil dibuat! Selamat datang!', 'ok');
+    setTimeout(() => window.location.href = 'dashboard.html', 800);
+  } catch(e) {
+    showErr('err-reg', 'Gagal: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Daftar';
+  }
+};
+
+async function boot() {
+  try {
+    // Redirect if already logged in
+    const ses = getSession();
+    if (ses) { window.location.href = 'dashboard.html'; return; }
+    await initDefaults();
+  } catch(e) {
+    console.error('Boot error:', e);
+    toast('Gagal koneksi ke server. Pastikan buka via Live Server.', 'er');
+  }
+  document.getElementById('ls').classList.add('hide');
+  document.getElementById('app').style.display = 'block';
+}
+
+boot();
+</script>
+</body>
+</html>
